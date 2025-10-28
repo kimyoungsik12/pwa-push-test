@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Push Notification Test - iPhone Safari</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+
+    <!-- iOS Specific Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Push Test">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 25px 0;
+        }
+
+        #notification-log {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        .icon {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Push Notification Test</h1>
+        <p class="subtitle">iPhone Safari 푸시 알림 테스트</p>
+
+        <div id="status" class="status info">
+            <span class="icon">ℹ️</span>
+            <span id="status-text">초기화 중...</span>
+        </div>
+
+        <button id="subscribe-btn" class="btn-primary" disabled>
+            알림 구독하기
+        </button>
+
+        <button id="unsubscribe-btn" class="btn-danger" style="display: none;">
+            알림 구독 해제
+        </button>
+
+        <div class="divider"></div>
+
+        <div class="input-group">
+            <label for="notification-title">알림 제목</label>
+            <input type="text" id="notification-title" placeholder="테스트 알림" value="테스트 알림">
+        </div>
+
+        <div class="input-group">
+            <label for="notification-body">알림 내용</label>
+            <input type="text" id="notification-body" placeholder="iPhone에서 푸시 알림 테스트" value="iPhone에서 푸시 알림 테스트">
+        </div>
+
+        <button id="send-btn" class="btn-success">
+            푸시 알림 전송
+        </button>
+
+        <div id="notification-log">
+            <div class="log-entry">📋 로그:</div>
+        </div>
+    </div>
+
+    <script>
+        let swRegistration = null;
+        let isSubscribed = false;
+
+        const statusDiv = document.getElementById('status');
+        const statusText = document.getElementById('status-text');
+        const subscribeBtn = document.getElementById('subscribe-btn');
+        const unsubscribeBtn = document.getElementById('unsubscribe-btn');
+        const sendBtn = document.getElementById('send-btn');
+        const logDiv = document.getElementById('notification-log');
+
+        function addLog(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(message, type = 'info') {
+            statusText.textContent = message;
+            statusDiv.className = `status ${type}`;
+            addLog(message);
+        }
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/\-/g, '+')
+                .replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        async function initializeServiceWorker() {
+            // 브라우저 정보 수집
+            const userAgent = navigator.userAgent;
+            const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+            const displayMode = window.matchMedia('(display-mode: standalone)').matches ? 'standalone' :
+                               window.matchMedia('(display-mode: fullscreen)').matches ? 'fullscreen' :
+                               window.matchMedia('(display-mode: minimal-ui)').matches ? 'minimal-ui' : 'browser';
+
+            addLog(`브라우저: ${userAgent.includes('iPhone') ? 'iPhone Safari' : 'Unknown'}`);
+            addLog(`iOS 버전: ${userAgent.match(/OS (\d+)_(\d+)/)?.[0] || '알 수 없음'}`);
+            addLog(`Display Mode: ${displayMode}`);
+            addLog(`navigator.standalone: ${window.navigator.standalone || false}`);
+            addLog(`독립 실행 모드: ${isStandalone ? '✅ 예 (홈 화면 앱)' : '❌ 아니오 (Safari 브라우저)'}`);
+            addLog(`HTTPS: ${location.protocol === 'https:' ? '✅ 예' : '❌ 아니오'}`);
+
+            // Service Worker 지원 확인
+            if (!('serviceWorker' in navigator)) {
+                updateStatus('❌ Service Worker 미지원 - iOS 11.3 이상 필요', 'error');
+                addLog('해결: iOS 버전을 11.3 이상으로 업데이트하세요');
+                return;
+            }
+            addLog('✅ Service Worker 지원됨');
+
+            // Push API 지원 확인
+            if (!('PushManager' in window)) {
+                updateStatus('❌ Push API 미지원', 'error');
+
+                if (!isStandalone) {
+                    addLog('');
+                    addLog('🚨 현재 Safari 브라우저로 실행 중입니다!');
+                    addLog('');
+                    addLog('✅ 해결 방법:');
+                    addLog('1️⃣ Safari 하단 공유 버튼(↑) 탭');
+                    addLog('2️⃣ "홈 화면에 추가" 선택');
+                    addLog('3️⃣ "추가" 탭');
+                    addLog('4️⃣ Safari 완전히 닫기');
+                    addLog('5️⃣ 홈 화면의 "Push Test" 아이콘으로 실행');
+                    addLog('');
+                    addLog('⚠️ Safari 브라우저가 아닌 홈 화면 아이콘으로 실행해야 합니다!');
+                } else {
+                    addLog('iOS 16.4 이상이 필요합니다.');
+                    addLog(`현재 iOS 버전: ${userAgent.match(/OS (\d+)_(\d+)/)?.[0] || '알 수 없음'}`);
+                }
+                return;
+            }
+            addLog('✅ Push API 지원됨');
+
+            // HTTPS 확인
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                updateStatus('❌ HTTPS 필요 - 로컬 네트워크에서도 HTTPS 필수', 'error');
+                addLog('해결: 서버를 HTTPS로 실행하세요');
+                return;
+            }
+            addLog('✅ HTTPS 연결');
+
+            try {
+                // Service Worker 등록 옵션 추가
+                swRegistration = await navigator.serviceWorker.register('/sw.js', {
+                    scope: '/',
+                    updateViaCache: 'none'
+                });
+
+                // 등록 완료 대기
+                await swRegistration.update();
+                addLog('✅ Service Worker 등록 성공');
+                addLog(`   Scope: ${swRegistration.scope}`);
+                addLog(`   상태: ${swRegistration.active ? 'active' : swRegistration.installing ? 'installing' : 'waiting'}`);
+
+                // 기존 구독 확인
+                const subscription = await swRegistration.pushManager.getSubscription();
+                isSubscribed = !(subscription === null);
+
+                if (isSubscribed) {
+                    updateStatus('푸시 알림이 구독되어 있습니다.', 'success');
+                    subscribeBtn.style.display = 'none';
+                    unsubscribeBtn.style.display = 'block';
+                } else {
+                    updateStatus('푸시 알림을 구독해주세요.', 'info');
+                    subscribeBtn.disabled = false;
+                }
+            } catch (error) {
+                updateStatus('Service Worker 등록 실패: ' + error, 'error');
+            }
+        }
+
+        async function subscribeUser() {
+            try {
+                const response = await fetch('/vapid-public-key');
+                const vapidPublicKey = (await response.json()).publicKey;
+                const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+
+                const subscription = await swRegistration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: convertedVapidKey
+                });
+
+                // 서버에 구독 정보 전송
+                const serverResponse = await fetch('/subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(subscription)
+                });
+
+                if (serverResponse.ok) {
+                    const result = await serverResponse.json();
+                    isSubscribed = true;
+
+                    if (result.updated) {
+                        updateStatus('✅ 이미 구독되어 있습니다 (중복 방지됨)', 'success');
+                        addLog('💡 같은 기기에서는 하나의 구독만 유지됩니다');
+                    } else {
+                        updateStatus('✅ 푸시 알림 구독 완료!', 'success');
+                    }
+
+                    subscribeBtn.style.display = 'none';
+                    unsubscribeBtn.style.display = 'block';
+                }
+            } catch (error) {
+                updateStatus('구독 실패: ' + error, 'error');
+            }
+        }
+
+        async function unsubscribeUser() {
+            try {
+                const subscription = await swRegistration.pushManager.getSubscription();
+                if (subscription) {
+                    await subscription.unsubscribe();
+
+                    await fetch('/unsubscribe', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(subscription)
+                    });
+
+                    isSubscribed = false;
+                    updateStatus('푸시 알림 구독 해제됨', 'info');
+                    subscribeBtn.style.display = 'block';
+                    unsubscribeBtn.style.display = 'none';
+                }
+            } catch (error) {
+                updateStatus('구독 해제 실패: ' + error, 'error');
+            }
+        }
+
+        async function sendNotification() {
+            const title = document.getElementById('notification-title').value;
+            const body = document.getElementById('notification-body').value;
+
+            try {
+                const response = await fetch('/send-notification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ title, body })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    updateStatus('푸시 알림 전송 성공!', 'success');
+                } else {
+                    updateStatus(result.message, 'error');
+                }
+            } catch (error) {
+                updateStatus('전송 실패: ' + error, 'error');
+            }
+        }
+
+        // Event Listeners
+        subscribeBtn.addEventListener('click', subscribeUser);
+        unsubscribeBtn.addEventListener('click', unsubscribeUser);
+        sendBtn.addEventListener('click', sendNotification);
+
+        // 페이지 로드시 초기화
+        window.addEventListener('load', initializeServiceWorker);
+    </script>
+</body>
+</html>
